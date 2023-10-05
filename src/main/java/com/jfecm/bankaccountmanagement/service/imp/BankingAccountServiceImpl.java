@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -42,23 +43,15 @@ public class BankingAccountServiceImpl implements BankingAccountService {
     /**
      * Retrieves a list of banking accounts based on their status.
      *
-     * @param accountStatus The status of banking accounts to filter by.
+     * @param status The status of banking accounts to filter by.
      * @return A list of banking accounts with the specified status.
      * @throws InvalidStatusException if an invalid status is provided.
      */
     @Override
-    public List<BankingAccount> getAllBankingAccounts(String accountStatus) {
+    public List<BankingAccount> getAllBankingAccounts(BankingAccountStatus status) {
         List<BankingAccount> accounts;
-
-        try {
-            BankingAccountStatus bankingAccountStatus = BankingAccountStatus.valueOf(accountStatus.toUpperCase());
-            accounts = bankingAccountRepository.findByBankingAccountStatus(bankingAccountStatus);
-            log.info("Returning the list of accounts. List size: " + accounts.size());
-        } catch (IllegalArgumentException e) {
-            log.error("Invalid status provided: " + accountStatus);
-            throw new InvalidStatusException("Invalid status provided.");
-        }
-
+        accounts = bankingAccountRepository.findByBankingAccountStatus(status);
+        log.info("Returning the list of accounts. List size: " + accounts.size());
         return accounts;
     }
 
@@ -70,6 +63,7 @@ public class BankingAccountServiceImpl implements BankingAccountService {
     @Override
     public void deleteBankingAccount(String accountNumber) {
         BankingAccount account = searchBankingAccountByAccountNumber(accountNumber);
+        checkAccountStatus(account);
 
         account.setBankingAccountStatus(BankingAccountStatus.CLOSED);
         account.setAccountClosingDate(LocalDate.now());
@@ -88,25 +82,13 @@ public class BankingAccountServiceImpl implements BankingAccountService {
      * @throws InvalidStatusException    if an invalid status is provided.
      */
     @Override
-    public void updateBankingAccountStatusByAccountNumber(String accountNumber, String newAccountStatus) {
+    public void updateBankingAccountStatusByAccountNumber(String accountNumber, BankingAccountStatus newAccountStatus) {
+        BankingAccount account = searchBankingAccountByAccountNumber(accountNumber);
 
-        try {
-            BankingAccount account = searchBankingAccountByAccountNumber(accountNumber);
-
-            BankingAccountStatus bankingAccountStatus = BankingAccountStatus.valueOf(newAccountStatus.toUpperCase());
-
-            if (!bankingAccountStatus.equals(account.getBankingAccountStatus())) {
-                account.setBankingAccountStatus(bankingAccountStatus);
-                bankingAccountRepository.save(account);
-                log.info("updateBankingAccountStatus() - OK.");
-            }
-
-        } catch (ResourceNotFoundException e) {
-            log.error("updateBankingAccountStatus() - account not found with account number: {}", accountNumber);
-            throw e;
-        } catch (IllegalArgumentException e) {
-            log.error("updateBankingAccountStatus() - Invalid status provided: " + newAccountStatus);
-            throw new InvalidStatusException("Invalid status provided.");
+        if (!newAccountStatus.equals(account.getBankingAccountStatus())) {
+            account.setBankingAccountStatus(newAccountStatus);
+            bankingAccountRepository.save(account);
+            log.info("updateBankingAccountStatus() - OK.");
         }
     }
 
@@ -172,12 +154,14 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         BankingAccount bankingAccount = searchBankingAccountByAccountNumber(accountNumber);
         checkAccountStatus(bankingAccount);
 
-        boolean removed = bankingAccount.getAccountTransactions().removeIf(transaction -> transaction.getId().equals(idTransaction));
+        Optional<AccountTransaction> transaction = accountTransactionRepository.findById(idTransaction);
 
-        if (!removed) {
+        if (transaction.isEmpty()) {
             throw new ResourceNotFoundException("Transaction not found with id " + idTransaction);
         }
 
+        accountTransactionRepository.deleteById(idTransaction);
+        log.info("deleteTransaction() - OK.");
     }
 
     /**
@@ -273,8 +257,9 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         checkAmount(amount);
 
         BankingAccount account = searchBankingAccountByAccountNumber(accountNumber);
+
         checkAccountStatus(account);
-        checkOverdraftLimit(account, amount);
+        checkWithdrawalLimit(account, amount);
         checkFunds(account.getBalance(), amount);
 
         account.setBalance(account.getBalance() - amount);
@@ -299,9 +284,14 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         BankingAccount sourceAccount = searchBankingAccountByAccountNumber(accountNumber);
         checkAccountStatus(sourceAccount);
         checkFunds(sourceAccount.getBalance(), transferAmount);
+        checkWithdrawalLimit(sourceAccount, transferAmount);
 
         BankingAccount destinationAccount = searchBankingAccountByAccountNumber(transaction.getDestinationAccountNumber());
         checkAccountStatus(destinationAccount);
+
+        if (sourceAccount.getAccountNumber().equals(destinationAccount.getAccountNumber())) {
+            throw new InvalidTransactionException("Cannot make a transfer into the same account.");
+        }
 
         AccountTransaction sourceTransfer = buildTransaction(sourceAccount, AccountTransactionType.TRANSFER, transferAmount);
         AccountTransaction destinationTransfer = buildTransaction(destinationAccount, AccountTransactionType.TRANSFER, transferAmount);
@@ -358,16 +348,19 @@ public class BankingAccountServiceImpl implements BankingAccountService {
     }
 
     /**
-     * Checks if a withdrawal transaction exceeds the account's overdraft limit.
+     * Checks if a withdrawal transaction exceeds the account's withdrawal limit.
      *
      * @param account The banking account.
      * @param amount  The withdrawal amount.
-     * @throws InsufficientFundsException if the withdrawal exceeds the account's limit.
+     * @throws InsufficientFundsException if the withdrawal exceeds the account's withdrawal limit.
      */
-    private void checkOverdraftLimit(BankingAccount account, Double amount) {
-        if (amount > (account.getBalance() + account.getOverdraftLimit())) {
-            throw new InsufficientFundsException("There are not enough funds for withdrawal.");
+    private void checkWithdrawalLimit(BankingAccount account, Double amount) {
+        Double withdrawalLimit = account.getWithdrawalLimit();
+
+        if (amount > withdrawalLimit) {
+            throw new InsufficientFundsException("Exceeded withdrawal limit. Withdrawal limit: " + withdrawalLimit);
         }
+
     }
 
     /**

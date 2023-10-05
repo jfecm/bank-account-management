@@ -118,11 +118,6 @@ public class AccountTransactionController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllTransactionsByAccount(@PathVariable String accountNumber) {
         List<AccountTransaction> transactions = bankingAccountService.getAllTransactionsByAccount(accountNumber);
-
-        if (transactions.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
-
         return new ResponseEntity<>(Map.of("Total", transactions.size(), "Result", transactions), HttpStatus.OK);
     }
 
@@ -137,12 +132,7 @@ public class AccountTransactionController {
     public ResponseEntity<Map<String, Object>> filterTransactionsByType(@PathVariable String accountNumber,
                                                                         @PathVariable AccountTransactionType transactionTypeFilter) {
         List<AccountTransaction> transactions = bankingAccountService.getAllTransactionsByType(accountNumber, transactionTypeFilter);
-
-        if (!transactions.isEmpty()) {
-            return new ResponseEntity<>(Map.of("Total", transactions.size(), "Result", transactions), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
+        return new ResponseEntity<>(Map.of("Total", transactions.size(), "Result", transactions), HttpStatus.OK);
     }
 
     /**
@@ -157,17 +147,12 @@ public class AccountTransactionController {
     public ResponseEntity<Map<String, Object>> filterTransactionsByDateRange(@PathVariable String accountNumber,
                                                                              @RequestParam("fromDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                              @RequestParam("toDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
-        if (fromDate == null || toDate == null || fromDate.isAfter(toDate)) {
-            return new ResponseEntity<>(Map.of("Result", "Check date filters"), HttpStatus.BAD_REQUEST);
+        if (fromDate.isAfter(toDate)) {
+            return new ResponseEntity<>(Map.of("Result", "The start date (fromDate) cannot be later than the end date (toDate). Please ensure that the dates are in the correct order and try again."), HttpStatus.BAD_REQUEST);
         }
 
         List<AccountTransaction> transactions = bankingAccountService.getAllTransactionsByDateRange(accountNumber, fromDate, toDate);
-
-        if (!transactions.isEmpty()) {
-            return new ResponseEntity<>(Map.of("Total", transactions.size(), "Result", transactions), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
+        return new ResponseEntity<>(Map.of("Total", transactions.size(), "Result", transactions), HttpStatus.OK);
     }
 
     /**
@@ -184,16 +169,11 @@ public class AccountTransactionController {
                                                                                     @RequestParam AccountTransactionType transactionTypeFilter,
                                                                                     @RequestParam("fromDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                                     @RequestParam("toDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
-        if (transactionTypeFilter == null || fromDate == null || toDate == null || fromDate.isAfter(toDate)) {
-            return new ResponseEntity<>(Map.of("Result", "Check date filters & type must not be null."), HttpStatus.BAD_REQUEST);
+        if (fromDate.isAfter(toDate)) {
+            return new ResponseEntity<>(Map.of("Result", "The start date (fromDate) cannot be later than the end date (toDate). Please ensure that the dates are in the correct order and try again."), HttpStatus.BAD_REQUEST);
         }
 
         List<AccountTransaction> transactions = bankingAccountService.getAllTransactionsByTypeAndDateRange(accountNumber, transactionTypeFilter, fromDate, toDate);
-
-        if (transactions.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
-
         return new ResponseEntity<>(Map.of("Total", transactions.size(), "Result", transactions), HttpStatus.OK);
 
     }

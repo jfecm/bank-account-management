@@ -5,6 +5,7 @@ import com.jfecm.bankaccountmanagement.dto.request.RequestUpdateTransaction;
 import com.jfecm.bankaccountmanagement.entity.AccountTransaction;
 import com.jfecm.bankaccountmanagement.entity.BankingAccount;
 import com.jfecm.bankaccountmanagement.entity.enums.AccountTransactionType;
+import com.jfecm.bankaccountmanagement.entity.enums.BankingAccountStatus;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -12,11 +13,11 @@ import java.util.List;
 public interface BankingAccountService {
     BankingAccount getBankingAccountByAccountNumber(String accountNumber);
 
-    List<BankingAccount> getAllBankingAccounts(String accountStatus);
+    List<BankingAccount> getAllBankingAccounts(BankingAccountStatus status);
 
     void deleteBankingAccount(String accountNumber);
 
-    void updateBankingAccountStatusByAccountNumber(String accountNumber, String newAccountStatus);
+    void updateBankingAccountStatusByAccountNumber(String accountNumber, BankingAccountStatus newAccountStatus);
 
     AccountTransaction rechargeAccountBalance(String accountNumber, Double amount);
 

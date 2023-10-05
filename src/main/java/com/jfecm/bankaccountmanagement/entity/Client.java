@@ -1,5 +1,6 @@
 package com.jfecm.bankaccountmanagement.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.jfecm.bankaccountmanagement.entity.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -81,5 +82,6 @@ public class Client {
      */
     @ManyToOne
     @JoinColumn(name = "main_client_id")
+    @JsonIgnore
     private Client mainClient;
 }

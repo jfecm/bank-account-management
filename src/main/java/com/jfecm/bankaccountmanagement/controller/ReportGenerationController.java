@@ -1,6 +1,8 @@
 package com.jfecm.bankaccountmanagement.controller;
 
+import com.jfecm.bankaccountmanagement.entity.AccountTransaction;
 import com.jfecm.bankaccountmanagement.entity.Client;
+import com.jfecm.bankaccountmanagement.service.BankingAccountService;
 import com.jfecm.bankaccountmanagement.service.ClientService;
 import com.jfecm.bankaccountmanagement.service.ExcelService;
 import com.jfecm.bankaccountmanagement.service.PdfService;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ import java.time.LocalDate;
 @RequestMapping("/api/v1/reports")
 public class ReportGenerationController {
     private final ClientService clientService;
+    private final BankingAccountService bankingAccountService;
     private final PdfService pdfService;
     private final ExcelService excelService;
 
@@ -31,7 +35,7 @@ public class ReportGenerationController {
      */
     @GetMapping(value = "/pdf/client/{dni}/account-details", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generateAccountDetailsPdf(@PathVariable String dni) {
-        // Get the client corresponding to the provided ID number
+        // Get the client corresponding to the provided DNI number
         Client client = clientService.getClientByDni(dni);
         // Generate the PDF for account details
         byte[] bis = pdfService.generateAccountDetailsPdf(client);
@@ -52,7 +56,7 @@ public class ReportGenerationController {
      */
     @GetMapping(value = "/pdf/client/{dni}/transactions", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generateAccountTransactionsPdf(@PathVariable String dni) {
-        // Get the client corresponding to the provided ID number
+        // Get the client corresponding to the provided DNI number
         Client client = clientService.getClientByDni(dni);
         // Generate the PDF for account transactions
         byte[] bis = pdfService.generateAccountTransactionsPdf(client);
@@ -77,10 +81,17 @@ public class ReportGenerationController {
     public ResponseEntity<byte[]> generateTransactionsByDateRangeExcel(@PathVariable String dni,
                                                                        @RequestParam("fromDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
                                                                        @RequestParam("toDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
-        // Get the client corresponding to the provided ID number
+        if (fromDate.isAfter(toDate)) {
+            String errorMessage = "Invalid date range: 'fromDate' must be before 'toDate'";
+            return ResponseEntity.badRequest().body(errorMessage.getBytes());
+        }
+
+        // Get the client corresponding to the provided DNI number
         Client client = clientService.getClientByDni(dni);
+        List<AccountTransaction> transactions = bankingAccountService.getAllTransactionsByDateRange(client.getBankingAccount().getAccountNumber(), fromDate, toDate);
+
         // Generate the Excel file with transactions filtered by date range
-        byte[] bis = excelService.generateAccountTransactionsByDateRangeExcel(client);
+        byte[] bis = excelService.generateAccountTransactionsByDateRangeExcel(transactions);
         // Create the Excel file name with the DNI and date range
         String filename = "AccountTransactions_Filtered_" + dni + "_FromDate_" + fromDate + "_ToDate_" + toDate + ".xlsx";
 

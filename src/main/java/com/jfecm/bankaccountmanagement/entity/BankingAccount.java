@@ -45,10 +45,10 @@ public class BankingAccount {
     private Double balance;
 
     /**
-     * The overdraft limit for the banking account.
+     * The withdrawal limit for the banking account.
      */
     @Column
-    private Double overdraftLimit;
+    private Double withdrawalLimit;
 
     /**
      * The date when the banking account was opened.

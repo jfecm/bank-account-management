@@ -1,6 +1,7 @@
 package com.jfecm.bankaccountmanagement.controller;
 
 import com.jfecm.bankaccountmanagement.entity.BankingAccount;
+import com.jfecm.bankaccountmanagement.entity.enums.BankingAccountStatus;
 import com.jfecm.bankaccountmanagement.service.BankingAccountService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +27,6 @@ public class BankingAccountController {
      */
     @GetMapping("/account/{accountNumber}")
     public ResponseEntity<Map<String, Object>> getBankingAccount(@PathVariable String accountNumber) {
-
         BankingAccount account = bankingAccountService.getBankingAccountByAccountNumber(accountNumber);
         return ResponseEntity.ok(Map.of("Result", account));
     }
@@ -38,13 +38,8 @@ public class BankingAccountController {
      * @return ResponseEntity with the list of banking accounts.
      */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllBankingAccounts(@RequestParam(required = false, defaultValue = "ACTIVE") String status) {
+    public ResponseEntity<Map<String, Object>> getAllBankingAccounts(@RequestParam(required = false, defaultValue = "ACTIVE") BankingAccountStatus status) {
         List<BankingAccount> accounts = bankingAccountService.getAllBankingAccounts(status);
-
-        if (accounts.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
-
         return new ResponseEntity<>(Map.of("Total", accounts.size(), "Result", accounts), HttpStatus.OK);
     }
 
@@ -57,7 +52,7 @@ public class BankingAccountController {
      */
     @PutMapping("/account/{accountNumber}/status/{newAccountStatus}")
     public ResponseEntity<Map<String, Object>> updateBankingAccountStatus(@PathVariable String accountNumber,
-                                                                          @PathVariable String newAccountStatus) {
+                                                                          @PathVariable BankingAccountStatus newAccountStatus) {
         bankingAccountService.updateBankingAccountStatusByAccountNumber(accountNumber, newAccountStatus);
         return ResponseEntity.ok(Map.of("Result", "Banking account status updated."));
     }

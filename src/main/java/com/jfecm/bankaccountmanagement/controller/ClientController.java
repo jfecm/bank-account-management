@@ -4,6 +4,7 @@ import com.jfecm.bankaccountmanagement.dto.request.RequestCreateClient;
 import com.jfecm.bankaccountmanagement.dto.request.RequestUpdateClient;
 import com.jfecm.bankaccountmanagement.dto.response.ResponseClientData;
 import com.jfecm.bankaccountmanagement.entity.Client;
+import com.jfecm.bankaccountmanagement.entity.enums.UserStatus;
 import com.jfecm.bankaccountmanagement.service.ClientService;
 import com.jfecm.bankaccountmanagement.service.EmailService;
 import com.jfecm.bankaccountmanagement.util.Email;
@@ -49,13 +50,8 @@ public class ClientController {
      * @return ResponseEntity with the list of customers.
      */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllClients(@RequestParam(required = false, defaultValue = "ACTIVE") String status) {
+    public ResponseEntity<Map<String, Object>> getAllClients(@RequestParam(required = false, defaultValue = "ACTIVE") UserStatus status) {
         List<ResponseClientData> clientList = clientService.getAllClients(status);
-
-        if (clientList.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
-
         return new ResponseEntity<>(Map.of("Total", clientList.size(), "Result", clientList), HttpStatus.OK);
     }
 
@@ -106,8 +102,91 @@ public class ClientController {
      */
     @PutMapping("/client/{dni}/status/{status}")
     public ResponseEntity<Map<String, Object>> updateClientStatusByDni(@PathVariable String dni,
-                                                                       @PathVariable String status) {
+                                                                       @PathVariable UserStatus status) {
         clientService.updateClientStatusByDni(dni, status);
         return ResponseEntity.ok(Map.of("Result", "Updated client status"));
     }
+    /**
+     * Creates a new adherent client for a main client identified by their DNI.
+     *
+     * @param dni              The DNI of the main client.
+     * @param adherentRequest  The data of the adherent client to be created.
+     * @return A response containing the result and the ID of the created adherent client.
+     */
+    @PostMapping("/client/{dni}/adherents/adherent")
+    public ResponseEntity<Map<String, Object>> createClientAdherent(@PathVariable String dni, @RequestBody RequestCreateClient adherentRequest) {
+        Client adherent = clientService.addClientAdherent(dni, adherentRequest);
+        return ResponseEntity.ok(Map.of("Result", "Client adherent created.", "Adherent", adherent));
+    }
+
+    /**
+     * Retrieves the list of adherent clients for a main client identified by their DNI.
+     *
+     * @param dni The DNI of the main client.
+     * @return A response containing the list of adherent clients.
+     */
+    @GetMapping("/client/{dni}/adherents")
+    public ResponseEntity<Map<String, Object>> getAdherents(@PathVariable String dni) {
+        List<Client> adherents = clientService.getClientAdherentsList(dni);
+        return ResponseEntity.ok(Map.of("Result", adherents));
+    }
+
+    /**
+     * Retrieves the details of an adherent client for a main client identified by their DNIs.
+     *
+     * @param dniMain      The DNI of the main client.
+     * @param dniAdherent  The DNI of the adherent client to retrieve.
+     * @return A response containing the details of the adherent client.
+     */
+    @GetMapping("/client/{dniMain}/adherents/adherent/{dniAdherent}")
+    public ResponseEntity<Map<String, Object>> getAdherent(@PathVariable String dniMain, @PathVariable String dniAdherent) {
+        Client adherent = clientService.getClientAdherentDetails(dniMain, dniAdherent);
+        return ResponseEntity.ok(Map.of("Result", adherent));
+    }
+
+    /**
+     * Deletes an adherent client from a main client's list of adherents.
+     *
+     * @param dniMain      The DNI of the main client.
+     * @param dniAdherent  The DNI of the adherent client to delete.
+     * @return A response indicating the result of the deletion.
+     */
+    @DeleteMapping("/client/{dniMain}/adherents/adherent/{dniAdherent}")
+    public ResponseEntity<Map<String, Object>> deleteAdherent(@PathVariable String dniMain, @PathVariable String dniAdherent) {
+        clientService.removeClientAdherent(dniMain, dniAdherent);
+        return ResponseEntity.ok(Map.of("Result", "Client adherent deleted."));
+    }
+
+    /**
+     * Updates the details of an adherent client for a main client identified by their DNIs.
+     *
+     * @param dniMain          The DNI of the main client.
+     * @param dniAdherent      The DNI of the adherent client to update.
+     * @param adherentRequest  The new data for the adherent client.
+     * @return A response containing the updated adherent client.
+     */
+    @PutMapping("/client/{dniMain}/adherents/adherent/{dniAdherent}")
+    public ResponseEntity<Map<String, Object>> updateAdherent(@PathVariable String dniMain,
+                                                              @PathVariable String dniAdherent,
+                                                              @RequestBody RequestUpdateClient adherentRequest) {
+        Client client = clientService.updateClientAdherentDetails(dniMain, dniAdherent, adherentRequest);
+        return ResponseEntity.ok(Map.of("Result", client));
+    }
+
+    /**
+     * Updates the status of an adherent client for a main client identified by their DNIs.
+     *
+     * @param dniMain      The DNI of the main client.
+     * @param dniAdherent  The DNI of the adherent client whose status will be changed.
+     * @param status       The new status for the adherent client.
+     * @return A response indicating the result of the status update.
+     */
+    @PutMapping("/client/{dniMain}/adherents/adherent/{dniAdherent}/status/{status}")
+    public ResponseEntity<Map<String, Object>> updateAdherentStatus(@PathVariable String dniMain,
+                                                                    @PathVariable String dniAdherent,
+                                                                    @PathVariable UserStatus status) {
+        clientService.changeClientAdherentStatus(dniMain, dniAdherent, status);
+        return ResponseEntity.ok(Map.of("Result", "Updated client adherent status."));
+    }
+
 }
