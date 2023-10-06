@@ -3,6 +3,7 @@ package com.jfecm.bankaccountmanagement.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.jfecm.bankaccountmanagement.entity.enums.UserStatus;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -13,6 +14,7 @@ import java.util.List;
 /**
  * Represents a client in the banking system.
  */
+@Builder
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
