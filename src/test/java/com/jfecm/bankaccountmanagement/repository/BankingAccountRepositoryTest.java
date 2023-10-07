@@ -31,7 +31,7 @@ class BankingAccountRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        clientWithBankingAccount = ClientBuilder.buildClientWithBankingAccount();
+        clientWithBankingAccount = ClientBuilder.buildClientWithBankingAccountRepository();
         clientRepository.save(clientWithBankingAccount);
         bankingAccount = clientWithBankingAccount.getBankingAccount();
     }

@@ -38,7 +38,7 @@ public class ClientServiceImpl implements ClientService {
      * @throws EmailDuplicateException   If the email is already registered.
      */
     @Override
-    public void saveClient(RequestCreateClient client) {
+    public Client saveClient(RequestCreateClient client) {
         try {
             validateIfDniExists(client.getDni());
 
@@ -51,13 +51,12 @@ public class ClientServiceImpl implements ClientService {
             BankingAccount defaultAccount = createDefaultBankingAccount(clientEntity);
             clientEntity.setBankingAccount(defaultAccount);
 
-            clientRepository.save(clientEntity);
+            Client saveClient = clientRepository.save(clientEntity);
 
-            log.info("saveClient() - OK.");
-        } catch (DniAlreadyExistsException e) {
-            log.error("saveClient() - Error= {}", e.getMessage());
-            throw e;
+            log.info("saveClient() - OK. Data: {}", saveClient);
+            return saveClient;
         } catch (DataIntegrityViolationException ex) {
+            log.error("The EMAIL={} is already registered.", client.getEmail());
             throw new EmailDuplicateException("Email already exists.");
         }
     }
@@ -82,7 +81,7 @@ public class ClientServiceImpl implements ClientService {
     /**
      * Generate a random Unique Account Number
      *
-     * @return Unique account number with length 10
+     * @return Unique account number
      */
     private String generateUniqueAccountNumber() {
         // Generate a random UUID
@@ -90,7 +89,6 @@ public class ClientServiceImpl implements ClientService {
         // Convert the UUID to a string and remove the dashes
         return uuid.toString().replace("-", "");
     }
-
 
     /**
      * Update a client's data by their DNI.
@@ -102,20 +100,15 @@ public class ClientServiceImpl implements ClientService {
      */
     @Override
     public Client updateClientByDni(String dni, RequestUpdateClient updateClient) {
-        try {
-            Client existingClient = getClientByDni(dni);
+        Client existingClient = getClientByDni(dni);
 
-            checkClientStatus(existingClient);
+        checkClientStatus(existingClient);
 
-            mapper.map(updateClient, existingClient);
+        mapper.map(updateClient, existingClient);
 
-            Client client = clientRepository.save(existingClient);
-            log.info("updateClient() - OK.");
-            return client;
-        } catch (ResourceNotFoundException e) {
-            log.error("updateClient() - Client not found with DNI: {}", dni);
-            throw e;
-        }
+        Client client = clientRepository.save(existingClient);
+        log.info("updateClient() - OK.");
+        return client;
     }
 
     /**
@@ -124,23 +117,19 @@ public class ClientServiceImpl implements ClientService {
      * @param dni    The DNI of the client to update.
      * @param status The new state of the client.
      * @throws ResourceNotFoundException If the client is not found.
-     * @throws InvalidStatusException    If an invalid status is provided.
      */
     @Override
     public void updateClientStatusByDni(String dni, UserStatus status) {
-        try {
-            Client client = getClientByDni(dni);
+        Client client = getClientByDni(dni);
 
-            if (!status.equals(client.getUserStatus())) {
-                client.setUserStatus(status);
-                clientRepository.save(client);
-                log.info("updateClientStatus() - OK.");
-            }
-
-        } catch (ResourceNotFoundException e) {
-            log.error("updateClientStatus() - Client not found with DNI: {}", dni);
-            throw e;
+        if (status.equals(client.getUserStatus())) {
+            log.info("updateClientStatus() - Status is already set to {}. No update required.", status);
+            return;
         }
+
+        client.setUserStatus(status);
+        clientRepository.save(client);
+        log.info("updateClientStatus() - OK.");
     }
 
     /**
@@ -168,6 +157,7 @@ public class ClientServiceImpl implements ClientService {
     public Client getClientByDni(String dni) {
         Client client = clientRepository.findByDni(dni);
         if (client == null) {
+            log.error("Client not found with DNI= {}", dni);
             throw new ResourceNotFoundException("Client not found with DNI: " + dni);
         }
         return client;
@@ -216,6 +206,7 @@ public class ClientServiceImpl implements ClientService {
     @Override
     public void checkClientStatus(Client client) {
         if (client.getUserStatus() != UserStatus.ACTIVE) {
+            log.error("the client {} is not active yet.", client.getDni());
             throw new InactiveAccountException("The client is not active.");
         }
     }
@@ -243,7 +234,7 @@ public class ClientServiceImpl implements ClientService {
         adherent.setBankingAccount(defaultAccount);
 
         adherent.setMainClient(mainClient);
-
+        log.info("Client adherent with DNI {} added for main client with DNI {}", adherentRequest.getDni(), dni);
         return clientRepository.save(adherent);
     }
 
@@ -271,14 +262,21 @@ public class ClientServiceImpl implements ClientService {
     public Client getClientAdherentDetails(String dniMain, String dniAdherent) {
         Client client = getClientByDni(dniMain);
         Client clientAdherent = getClientByDni(dniAdherent);
+        Client adherent = checkIsAdherent(client, clientAdherent);
+        log.info("Returning the adherent. Data: " + adherent);
+        return adherent;
+    }
 
+    private Client checkIsAdherent(Client client, Client clientAdherent) {
         for (Client adherent : client.getAdherents()) {
             if (adherent.getDni().equals(clientAdherent.getDni())) {
                 return adherent;
             }
         }
 
-        throw new ResourceNotFoundException("The client with DNI " + dniAdherent + " is not a adherent of " + dniMain);
+        log.info("DNI {} is not an adherent of DNI {}", clientAdherent.getDni(), client.getDni());
+
+        throw new ResourceNotFoundException("The client with DNI " + clientAdherent.getDni() + " is not a adherent of " +  client.getDni());
     }
 
     /**
@@ -292,19 +290,13 @@ public class ClientServiceImpl implements ClientService {
     public void removeClientAdherent(String dniMain, String dniAdherent) {
         Client client = getClientByDni(dniMain);
         Client clientAdherent = getClientByDni(dniAdherent);
+        Client adherent = checkIsAdherent(client, clientAdherent);
 
-        for (Client adherent : client.getAdherents()) {
-            if (adherent.getDni().equals(clientAdherent.getDni())) {
-                BankingAccount bankingAccount = adherent.getBankingAccount();
-                bankingAccount.setClient(null);
-                clientRepository.deleteById(clientAdherent.getId());
-                bankingAccountRepository.deleteById(bankingAccount.getId());
-                return;
-            }
-        }
-
-        throw new ResourceNotFoundException("The client with DNI " + dniAdherent + " is not a adherent of " + dniMain);
-
+        BankingAccount bankingAccount = adherent.getBankingAccount();
+        bankingAccount.setClient(null);
+        clientRepository.deleteById(adherent.getId());
+        bankingAccountRepository.deleteById(bankingAccount.getId());
+        log.info("Removed adherent with DNI {} for main client with DNI {}", dniAdherent, dniMain);
     }
 
     /**
@@ -320,15 +312,11 @@ public class ClientServiceImpl implements ClientService {
     public Client updateClientAdherentDetails(String dniMain, String dniAdherent, RequestUpdateClient adherentRequest) {
         Client client = getClientByDni(dniMain);
         Client clientAdherent = getClientByDni(dniAdherent);
-
-        for (Client adherent : client.getAdherents()) {
-            if (adherent.getDni().equals(clientAdherent.getDni())) {
-                mapper.map(adherentRequest, adherent);
-                return clientRepository.save(adherent);
-            }
-        }
-
-        throw new ResourceNotFoundException("The client with DNI " + dniAdherent + " is not a adherent of " + dniMain);
+        Client adherent = checkIsAdherent(client, clientAdherent);
+        mapper.map(adherentRequest, adherent);
+        Client clientAdherentUpdated = clientRepository.save(adherent);
+        log.info("Data of adherent with DNI {} changed to {} for main client with DNI {}", dniAdherent, adherent, dniMain);
+        return clientAdherentUpdated;
     }
 
     /**
@@ -343,15 +331,9 @@ public class ClientServiceImpl implements ClientService {
     public void changeClientAdherentStatus(String dniMain, String dniAdherent, UserStatus status) {
         Client client = getClientByDni(dniMain);
         Client clientAdherent = getClientByDni(dniAdherent);
-
-        for (Client adherent : client.getAdherents()) {
-            if (adherent.getDni().equals(clientAdherent.getDni())) {
-                adherent.setUserStatus(status);
-                clientRepository.save(adherent);
-                return;
-            }
-        }
-
-        throw new ResourceNotFoundException("The client with DNI " + dniAdherent + " is not a adherent of " + dniMain);
+        Client adherent = checkIsAdherent(client, clientAdherent);
+        adherent.setUserStatus(status);
+        clientRepository.save(adherent);
+        log.info("Status of adherent with DNI {} changed to {} for main client with DNI {}", dniAdherent, status, dniMain);
     }
 }

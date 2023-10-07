@@ -4,6 +4,7 @@ import com.jfecm.bankaccountmanagement.entity.enums.AccountTransactionType;
 import com.jfecm.bankaccountmanagement.entity.enums.BankingAccountStatus;
 import com.jfecm.bankaccountmanagement.entity.enums.UserStatus;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -17,6 +18,11 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(value = DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+        return createErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST);
+    }
 
     @ExceptionHandler(value = NumberFormatException.class)
     public ResponseEntity<Map<String, Object>> handleNumberFormatException(NumberFormatException e) {

@@ -7,7 +7,19 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public class BankingAccountBuilder {
-    public static BankingAccount buildBankingAccount() {
+    public static BankingAccount buildBankingAccountService() {
+        return BankingAccount.builder()
+                .id(1L)
+                .accountNumber(getRandomAccountNumber())
+                .balance(0.0)
+                .withdrawalLimit(0.0)
+                .accountOpenedDate(LocalDate.now())
+                .accountClosingDate(LocalDate.now())
+                .bankingAccountStatus(BankingAccountStatus.ACTIVE)
+                .build();
+    }
+
+    public static BankingAccount buildBankingAccountRepository() {
         return BankingAccount.builder()
                 .accountNumber(getRandomAccountNumber())
                 .balance(0.0)

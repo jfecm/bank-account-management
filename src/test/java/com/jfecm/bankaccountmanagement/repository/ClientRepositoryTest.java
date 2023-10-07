@@ -26,7 +26,7 @@ class ClientRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        client = ClientBuilder.buildClientWithoutBankingAccount();
+        client = ClientBuilder.buildClientWithoutBankingAccountRepository();
     }
 
     @AfterEach

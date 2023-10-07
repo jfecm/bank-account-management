@@ -37,7 +37,9 @@ public class BankingAccountServiceImpl implements BankingAccountService {
      */
     @Override
     public BankingAccount getBankingAccountByAccountNumber(String accountNumber) {
-        return searchBankingAccountByAccountNumber(accountNumber);
+        BankingAccount bankingAccount = searchBankingAccountByAccountNumber(accountNumber);
+        log.info("Bank account successfully found for account number {}: {}", accountNumber, bankingAccount);
+        return bankingAccount;
     }
 
     /**
@@ -49,8 +51,7 @@ public class BankingAccountServiceImpl implements BankingAccountService {
      */
     @Override
     public List<BankingAccount> getAllBankingAccounts(BankingAccountStatus status) {
-        List<BankingAccount> accounts;
-        accounts = bankingAccountRepository.findByBankingAccountStatus(status);
+        List<BankingAccount> accounts = bankingAccountRepository.findByBankingAccountStatus(status);
         log.info("Returning the list of accounts. List size: " + accounts.size());
         return accounts;
     }
@@ -101,7 +102,9 @@ public class BankingAccountServiceImpl implements BankingAccountService {
     @Override
     public List<AccountTransaction> getAllTransactionsByAccount(String accountNumber) {
         BankingAccount bankingAccount = searchBankingAccountByAccountNumber(accountNumber);
-        return bankingAccount.getAccountTransactions();
+        List<AccountTransaction> accountTransactions = bankingAccount.getAccountTransactions();
+        log.info("Returning the list of account transactions. List size: " + accountTransactions.size());
+        return accountTransactions;
     }
 
     /**
@@ -117,7 +120,9 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         checkAccountStatus(bankingAccount);
 
         List<AccountTransaction> accountTransactions = bankingAccount.getAccountTransactions();
-        return accountTransactions.stream().filter(transaction -> transaction.getId().equals(idTransaction)).findFirst().orElseThrow(() -> new ResourceNotFoundException("Transaction not found with id " + idTransaction));
+        AccountTransaction transaction = getFoundTransactionById(idTransaction, accountTransactions);
+        log.info("Bank account transaction successfully found for account number {}: {}", accountNumber, transaction);
+        return transaction;
     }
 
     /**
@@ -135,12 +140,24 @@ public class BankingAccountServiceImpl implements BankingAccountService {
 
         List<AccountTransaction> accountTransactions = bankingAccount.getAccountTransactions();
 
-        AccountTransaction foundTransaction = accountTransactions.stream().filter(transaction -> transaction.getId().equals(idTransaction)).findFirst().orElseThrow(() -> new ResourceNotFoundException("Transaction not found with id " + idTransaction));
+        AccountTransaction foundTransaction = getFoundTransactionById(idTransaction, accountTransactions);
 
         mapper.map(accountTransaction, foundTransaction);
         foundTransaction.setTimeOfExecution(LocalTime.now());
         foundTransaction.setDateOfExecution(LocalDate.now());
+        log.info("Transaction with ID {} updated successfully for account number {}", idTransaction, accountNumber);
         return accountTransactionRepository.save(foundTransaction);
+    }
+
+    private AccountTransaction getFoundTransactionById(Long idTransaction, List<AccountTransaction> accountTransactions) {
+        Optional<AccountTransaction> transaction = accountTransactions.stream().filter(t -> t.getId().equals(idTransaction)).findFirst();
+
+        if (transaction.isEmpty()) {
+            log.error("Transaction not found with id {}", idTransaction);
+            throw new ResourceNotFoundException("Transaction not found with id " + idTransaction);
+        }
+
+        return transaction.get();
     }
 
     /**
@@ -176,9 +193,14 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         BankingAccount bankingAccount = searchBankingAccountByAccountNumber(accountNumber);
         checkAccountStatus(bankingAccount);
 
-        List<AccountTransaction> accountTransactions = bankingAccount.getAccountTransactions();
+        List<AccountTransaction> accountTransactionList = bankingAccount.getAccountTransactions().stream()
+                .filter(transaction -> transaction.getAccountTransactionType() == type)
+                .collect(Collectors.toList());
 
-        return accountTransactions.stream().filter(transaction -> transaction.getAccountTransactionType() == type).collect(Collectors.toList());
+        log.info("Getting all {} transactions for account number {}", type, accountNumber);
+        log.info("Found {} {} transactions.", accountTransactionList.size(), type);
+
+        return accountTransactionList;
     }
 
     /**
@@ -194,12 +216,15 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         BankingAccount bankingAccount = searchBankingAccountByAccountNumber(accountNumber);
         checkAccountStatus(bankingAccount);
 
-        List<AccountTransaction> accountTransactions = bankingAccount.getAccountTransactions();
+        List<AccountTransaction> accountTransactionList = bankingAccount.getAccountTransactions().stream()
+                .filter(transaction -> {
+                     LocalDate transactionDate = transaction.getDateOfExecution();
+                     return !transactionDate.isBefore(fromDate) && !transactionDate.isAfter(toDate);
+                }).collect(Collectors.toList());
 
-        return accountTransactions.stream().filter(transaction -> {
-            LocalDate transactionDate = transaction.getDateOfExecution();
-            return !transactionDate.isBefore(fromDate) && !transactionDate.isAfter(toDate);
-        }).collect(Collectors.toList());
+        log.info("Getting transactions for account number {} in the date range from {} to {}", accountNumber, fromDate, toDate);
+        log.info("Found {} transactions within the specified date range.", accountTransactionList.size());
+        return accountTransactionList;
     }
 
     /**
@@ -216,12 +241,15 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         BankingAccount bankingAccount = searchBankingAccountByAccountNumber(accountNumber);
         checkAccountStatus(bankingAccount);
 
-        List<AccountTransaction> accountTransactions = bankingAccount.getAccountTransactions();
-
-        return accountTransactions.stream().filter(transaction -> {
+        List<AccountTransaction> accountTransactionList = bankingAccount.getAccountTransactions().stream().filter(transaction -> {
             LocalDate transactionDate = transaction.getDateOfExecution();
             return transaction.getAccountTransactionType() == type && !transactionDate.isBefore(fromDate) && !transactionDate.isAfter(toDate);
         }).collect(Collectors.toList());
+
+        log.info("Getting {} transactions for account number {} in the date range from {} to {}", type, accountNumber, fromDate, toDate);
+        log.info("Found {} {} transactions within the specified date range.", accountTransactionList.size(), type);
+
+        return accountTransactionList;
     }
 
     /**
@@ -241,7 +269,7 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         account.setBalance(account.getBalance() + amount);
         AccountTransaction transferTransaction = buildTransaction(account, AccountTransactionType.RECHARGE, amount);
         account.getAccountTransactions().add(transferTransaction);
-
+        log.info("Recharged {} to the account with number {}. New balance: {}", amount, accountNumber, account.getBalance());
         return accountTransactionRepository.save(transferTransaction);
     }
 
@@ -265,7 +293,7 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         account.setBalance(account.getBalance() - amount);
         AccountTransaction transferTransaction = buildTransaction(account, AccountTransactionType.WITHDRAWAL, amount);
         account.getAccountTransactions().add(transferTransaction);
-
+        log.info("Withdrawal {} to the account with number {}. New balance: {}", amount, accountNumber, account.getBalance());
         return accountTransactionRepository.save(transferTransaction);
     }
 
@@ -301,6 +329,10 @@ public class BankingAccountServiceImpl implements BankingAccountService {
 
         accountTransactionRepository.save(sourceTransfer);
         accountTransactionRepository.save(destinationTransfer);
+        log.info("Transfer of {} from account {} to account {} completed successfully. New balance for {} is {} and for {} is {}",
+                transferAmount, sourceAccount.getAccountNumber(), destinationAccount.getAccountNumber(),
+                sourceAccount.getAccountNumber(), sourceAccount.getBalance(),
+                destinationAccount.getAccountNumber(), destinationAccount.getBalance());
 
         return sourceTransfer;
     }
@@ -314,7 +346,13 @@ public class BankingAccountServiceImpl implements BankingAccountService {
      * @return The newly created account transaction.
      */
     private AccountTransaction buildTransaction(BankingAccount account, AccountTransactionType accountTransactionType, Double amount) {
-        return AccountTransaction.builder().amount(amount).accountTransactionType(accountTransactionType).dateOfExecution(LocalDate.now()).timeOfExecution(LocalTime.now()).bankingAccount(account).build();
+        return AccountTransaction.builder()
+                .amount(amount)
+                .accountTransactionType(accountTransactionType)
+                .dateOfExecution(LocalDate.now())
+                .timeOfExecution(LocalTime.now())
+                .bankingAccount(account)
+                .build();
     }
 
     /**
@@ -327,6 +365,7 @@ public class BankingAccountServiceImpl implements BankingAccountService {
         BankingAccount account = bankingAccountRepository.findByAccountNumber(accountNumber);
 
         if (account == null) {
+            log.error("No banking account found for account number: {}", accountNumber);
             throw new ResourceNotFoundException("Account not found with account number: " + accountNumber);
         }
 
@@ -371,6 +410,7 @@ public class BankingAccountServiceImpl implements BankingAccountService {
      */
     private void checkAccountStatus(BankingAccount account) {
         if (account.getBankingAccountStatus() != BankingAccountStatus.ACTIVE) {
+            log.error("Account status check failed for account number {}: The bank account is not active.", account.getAccountNumber());
             throw new InactiveAccountException("The bank account is not active.");
         }
     }
@@ -383,6 +423,7 @@ public class BankingAccountServiceImpl implements BankingAccountService {
      */
     private void checkAmount(Double amount) {
         if (amount <= 0) {
+            log.error("Invalid amount: {}", amount);
             throw new InvalidTransactionException("The amount must be positive.");
         }
     }

@@ -35,9 +35,9 @@ public class ClientController {
     @PostMapping("/client")
     public ResponseEntity<Map<String, Object>> createClient(@RequestBody RequestCreateClient client) {
         try {
-            clientService.saveClient(client);
+            Client clientCreated = clientService.saveClient(client);
             emailService.sendEmail(client.getEmail(), "Welcome message", Email.welcomeMessage(client));
-            return ResponseEntity.ok(Map.of("Result", "Client Created."));
+            return ResponseEntity.ok(Map.of("Result", "Client created and email sent.", "Data", clientCreated));
         } catch (MessagingException e) {
             return ResponseEntity.internalServerError().body(Map.of("Error", "An error occurred while sending the email."));
         }

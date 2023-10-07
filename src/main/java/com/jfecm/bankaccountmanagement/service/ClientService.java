@@ -9,7 +9,7 @@ import com.jfecm.bankaccountmanagement.entity.enums.UserStatus;
 import java.util.List;
 
 public interface ClientService {
-    void saveClient(RequestCreateClient client);
+    Client saveClient(RequestCreateClient client);
 
     Client updateClientByDni(String dni, RequestUpdateClient client);
 
@@ -22,7 +22,6 @@ public interface ClientService {
     List<ResponseClientData> getAllClients(UserStatus status);
 
     void checkClientStatus(Client client);
-
 
     Client addClientAdherent(String dni, RequestCreateClient adherentRequest);
 
