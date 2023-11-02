@@ -32,12 +32,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("AccountTransactionController Tests")
 @WebMvcTest(AccountTransactionController.class)
 class AccountTransactionControllerTest {
+
     @Autowired
     private MockMvc mockMvc;
+
     @MockBean
     private BankingAccountService bankingAccountService;
+
     @Autowired
     private ObjectMapper objectMapper;
+
     @BeforeEach
     void setUp() {
     }
