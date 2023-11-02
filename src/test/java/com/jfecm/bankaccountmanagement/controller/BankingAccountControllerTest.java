@@ -24,8 +24,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("BankingAccountController Tests")
 @WebMvcTest(BankingAccountController.class)
 class BankingAccountControllerTest {
+
     @MockBean
     private BankingAccountService bankingAccountService;
+
     @Autowired
     private MockMvc mockMvc;
 
