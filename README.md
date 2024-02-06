@@ -45,6 +45,13 @@ Tech Details:
   mvn test
 ```
 
+* Access Swagger:
+```
+  http://localhost:8080/swagger-ui/index.html
+```
+![](swagger.png)
+  
+
 ## 3. Dockerfile
 
 This project provides a Dockerfile using multi stages.
